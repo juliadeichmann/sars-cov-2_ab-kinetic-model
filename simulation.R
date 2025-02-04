@@ -1,3 +1,13 @@
+# Code that accompanies the following manuscript:
+#
+# Title:   Predicting antibody kinetics and duration of protection against 
+#          SARS-CoV-2 following vaccination from sparse serological data
+# Authors: Julia Deichmann, Noam Barda, Michal Canetti, Yovel Peretz, Yael Ottolenghi,
+#          Yaniv Lustig, Gili Regev-Yochay, Marc Lipsitch
+#
+# Date:    February 4, 2025
+# Author:  Julia Deichmann <jdeichmann@hsph.harvard.edu>
+
 library(cmdstanr)
 library(tidyr)
 library(dplyr)
