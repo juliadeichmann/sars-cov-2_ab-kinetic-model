@@ -1,3 +1,13 @@
+// Stan code that accompanies the following manuscript:
+//
+// Title:   Predicting antibody kinetics and duration of protection against 
+//          SARS-CoV-2 following vaccination from sparse serological data
+// Authors: Julia Deichmann, Noam Barda, Michal Canetti, Yovel Peretz, Yael Ottolenghi,
+//          Yaniv Lustig, Gili Regev-Yochay, Marc Lipsitch
+//
+// Date:    February 4, 2025
+// Author:  Julia Deichmann <jdeichmann@hsph.harvard.edu>
+
 functions {
   vector AbKin(vector t, vector tv, real A0, vector gB, vector delta, real rho, real c1, real r, real c2) {   
 
