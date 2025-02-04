@@ -1,59 +1,38 @@
-library(bayesplot)
 library(dplyr)
 library(tidyr)
-library(readr)
 library(ggplot2)
 library(gridExtra)
 
 
-obs <- readRDS("data_synthetic/synthetic_data.RDS")
-data_stan <- readRDS("data_synthetic/data_stan.RDS")
+obs <- readRDS(file.path(here::here(), "data_synthetic", "synthetic_data.RDS"))
+data_stan <- readRDS(file.path(here::here(), "data_synthetic", "data_stan.RDS"))
 
-fit <- readRDS("results/fit.RDS")  
-post <- fit$draws(format="df")
+post_pop_pars <- readRDS(file.path(here::here(), "results", "posterior_pop-params.RDS"))
+post_beta_pars <- readRDS(file.path(here::here(), "results", "posterior_beta-params.RDS"))
+post_sigma_pars <- readRDS(file.path(here::here(), "results", "posterior_sigma-params.RDS"))
 
-
-### fit diagnostics ###
-
-fit$diagnostic_summary()
-
-
-pop_params <- c("log_A0_pop", "log_gB_pop[1]", "log_gB_pop[2]",
-                "rho_pop", "log_r", "log_c_pop[1]", "log_c_pop[2]", "sigma")
-sigma_params <- c("A0_sigma", "gB1_sigma", "gB2_sigma", "rho_sigma",
-                  "c2_sigma", "c1_sigma")
-
-beta_gB1_params <- names(post %>% select(matches("beta_gB1")))
-beta_gB2_params <- names(post %>% select(matches("beta_gB2")))
-beta_c1_params <- names(post %>% select(matches("beta_c1")))
-beta_c2_params <- names(post %>% select(matches("beta_c2")))
-beta_params <- c(beta_gB1_params, beta_gB2_params, beta_c1_params, beta_c2_params)
-
-fit$summary(variables=pop_params)
-fit$summary(variables=beta_params)
-fit$summary(variables=sigma_params)
-
-mcmc_trace(post, pars=pop_params)
-mcmc_trace(post, pars=beta_params)
-mcmc_trace(post, pars=sigma_params)
+y_pp <- readRDS(file.path(here::here(), "results", "posterior-summary_y.RDS"))
 
 
 ### parameters ###
 
-tmp_gB1 <- fit$summary(variables = beta_gB1_params, ~quantile(.x, probs = c(0.025, 0.5, 0.975)))
-tmp_gB1$name <- "gB1"
-tmp_gB2 <- fit$summary(variables = beta_gB2_params, ~quantile(.x, probs = c(0.025, 0.5, 0.975)))
-tmp_gB2$name <- "gB2"
-tmp_c2 <- fit$summary(variables = beta_c2_params, ~quantile(.x, probs = c(0.025, 0.5, 0.975)))
-tmp_c2$name <- "cs"
-tmp_c1 <- fit$summary(variables = beta_c1_params, ~quantile(.x, probs = c(0.025, 0.5, 0.975)))
-tmp_c1$name <- "cl"
+beta_summary <- post_beta_pars %>%
+  mutate(parameter=factor(parameter, levels=unique(parameter))) %>%
+  group_by(parameter) %>%
+  summarize(q025=quantile(value, 0.025),
+            median=quantile(value, 0.5),
+            q975=quantile(value, 0.975))
 
-beta_summary <- rbind(tmp_gB1, tmp_gB2, tmp_c2, tmp_c1)
+beta_summary$name = NA
+beta_summary[grepl("gB1", beta_summary$parameter),]$name = "gB1"
+beta_summary[grepl("gB2", beta_summary$parameter),]$name = "gB2"
+beta_summary[grepl("c2", beta_summary$parameter),]$name = "cs"
+beta_summary[grepl("c1", beta_summary$parameter),]$name = "cl"
 
-p_beta <- ggplot(beta_summary, aes(x = exp(`50%`), y = rep(10:1, 4))) + 
-  geom_vline(aes(xintercept = 1), size = .25, color="grey80") +
-  geom_errorbarh(aes(xmax = exp(`97.5%`), xmin = exp(`2.5%`)), linewidth = .25, 
+
+p_beta <- ggplot(beta_summary, aes(x = exp(median), y = rep(10:1, 4))) + 
+  geom_vline(aes(xintercept = 1), linewidth = .25, color="grey80") +
+  geom_errorbarh(aes(xmax = exp(q975), xmin = exp(q025)), linewidth = .25, 
                  height = 0) +
   geom_point(size = 1) +
   theme_bw()+
@@ -75,12 +54,9 @@ ggsave(
   width = 5.5, height = 2.5, units = "in", dpi = 450)
 
 
-fit_pars <- post[pop_params] %>%
-  tidyr::pivot_longer(cols=everything())
-
-post_pop <- ggplot(data=fit_pars, aes(value)) + 
+post_pop <- ggplot(data=post_pop_pars, aes(value)) + 
   geom_histogram(color="black", fill="#680369FF", size=.25) +
-  facet_wrap(~name, scales = "free_x", nrow=2) +   
+  facet_wrap(~parameter, scales = "free_x", nrow=2) +   
   theme_bw() + 
   theme(panel.grid = element_blank(),
         axis.title = element_text(size=9, color="grey20"),
@@ -95,13 +71,19 @@ ggsave(
   width = 5.5, height = 3, units = "in", dpi = 450)
 
 
-tmp_sigma <- fit$summary(variables = sigma_params, ~quantile(.x, probs = c(0.025, 0.5, 0.975)))
-p_sigma <- ggplot(tmp_sigma, aes(x = `50%`, y = 6:1)) +
-  geom_vline(aes(xintercept = 0), size = .25, color="grey80") +
-  geom_errorbarh(aes(xmax = `97.5%`, xmin = `2.5%`), linewidth = .25, 
+sigma_summary <- post_sigma_pars %>%
+  mutate(parameter=factor(parameter, levels=unique(parameter))) %>%
+  group_by(parameter) %>%
+  summarize(q025=quantile(value, 0.025),
+            median=quantile(value, 0.5),
+            q975=quantile(value, 0.975))
+
+p_sigma <- ggplot(sigma_summary, aes(x = median, y = 6:1)) +
+  geom_vline(aes(xintercept = 0), linewidth = .25, color="grey80") +
+  geom_errorbarh(aes(xmax = q975, xmin = q025), linewidth = .25, 
                  height = 0) +
   geom_point(size = 1) +
-  scale_y_continuous(breaks=6:1, labels=tmp_sigma$variable) +
+  scale_y_continuous(breaks=6:1, labels=sigma_summary$parameter) +
   theme_bw() + 
   theme(panel.grid = element_blank(),
         axis.title.x = element_text(size=9, color="grey20"),
@@ -118,28 +100,14 @@ ggsave(
 
 
 ### residuals ###
-
-pp_summary <- post %>%                     
-  select(matches("ypred")) %>%
-  pivot_longer(cols=everything()) %>%
-  mutate(i=parse_number(name)) %>%
-  group_by(i) %>%
-  summarize(
-    mean = mean(value),
-    lower = quantile(value, .025),
-    upper = quantile(value, .975),
-    GMT_pred = exp(mean(log(value)))
-  ) %>%
-  mutate(ID=obs$ID) %>%
-  mutate(time=data_stan$t) 
   
-pp_summary <- merge(pp_summary[,c("ID", "time", "GMT_pred")], 
+pp_summary <- merge(y_pp[,c("ID", "time", "GMT_pred")], 
                     obs[,c("ID", "time", "obs")], by=c("ID", "time")) %>%
   mutate(res_log=log(obs)-log(GMT_pred))
 
 p_res <- ggplot(pp_summary, aes(x=time, y=res_log)) +
   geom_point(size=.25) +
-  geom_hline(yintercept=0, color="darkorange3", lwd=.5, linetype="dashed") +
+  geom_hline(yintercept=0, color="darkorange3", linewidth=.5, linetype="dashed") +
   theme_bw() + 
   theme(panel.grid = element_blank(),
         axis.title=element_text(size=9, color="grey20"),
@@ -204,7 +172,7 @@ for (i in 1:(length(month_start)-1)){
 }
 
 p_traj <- ggplot() +
-  geom_hline(yintercept=0.62, linetype="dashed", lwd=.25, color="grey80") +
+  geom_hline(yintercept=0.62, linetype="dashed", linewidth=.25, color="grey80") +
   geom_jitter(data=subset(pp_summary, week<=5), aes(x=week*7-1.5, y=log(obs)), color="slategray3",
               alpha=.5, size=.2, width=1) +
   geom_boxplot(data=subset(pp_summary, week<=5), aes(x=week*7-1.5, y=log(obs), group=factor(week)),
